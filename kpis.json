@@ -1,0 +1,92 @@
+{
+  "inscrits_total": 2393,
+  "parcours_mix": {
+    "12km": 1463,
+    "21km": 930
+  },
+  "sexe_mix": {
+    "H": 1470,
+    "F": 923
+  },
+  "tranches_age": {
+    "<18": 14,
+    "18-24": 313,
+    "25-34": 946,
+    "35-44": 548,
+    "45-54": 366,
+    "55-64": 173,
+    "65+": 33
+  },
+  "local_13_pct": 76.3,
+  "presence_pct": 90.8,
+  "paid_ok_pct": 100.0,
+  "promo_pct": 20.3,
+  "early_ticket_pct": 100.0,
+  "france_pct": 98.8,
+  "licence_ok_pct": 97.2,
+  "type_paiement_mix": {
+    "Carte bancaire": 2390,
+    "Inscription manuelle": 3
+  },
+  "top_departements": {
+    "13": 1826,
+    "83": 66,
+    "75": 49,
+    "69": 40,
+    "34": 36,
+    "84": 34,
+    "30": 21,
+    "38": 18,
+    "04": 17,
+    "42": 17,
+    "05": 17,
+    "26": 16,
+    "06": 15,
+    "92": 12,
+    "31": 12
+  },
+  "top_villes": {
+    "Marseille": 1194,
+    "MARSEILLE": 129,
+    "Aix-en-Provence": 49,
+    "Paris": 43,
+    "marseille": 33,
+    "Lyon": 23,
+    "Allauch": 19,
+    "Aubagne": 19,
+    "La Ciotat": 18,
+    "Aix en Provence": 16,
+    "Toulon": 16,
+    "Vitrolles": 13,
+    "Montpellier": 12,
+    "Velaux": 9,
+    "Grenoble": 9
+  },
+  "inscriptions_weeks_min": "2024-01-01 00:00:00",
+  "inscriptions_weeks_max": "2024-12-09 00:00:00",
+  "lead_days_median": 63.0,
+  "presence_by_parcours_tranche": {
+    "12km": {
+      "<18": 0.857,
+      "18-24": 0.938,
+      "25-34": 0.913,
+      "35-44": 0.903,
+      "45-54": 0.949,
+      "55-64": 0.891,
+      "65+": 0.833
+    },
+    "21km": {
+      "<18": 0.0,
+      "18-24": 0.942,
+      "25-34": 0.87,
+      "35-44": 0.904,
+      "45-54": 0.894,
+      "55-64": 0.937,
+      "65+": 0.889
+    }
+  },
+  "promo_by_parcours": {
+    "12km": 0.197,
+    "21km": 0.213
+  }
+}
