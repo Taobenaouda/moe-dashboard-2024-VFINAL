@@ -92,7 +92,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
 def _find_logo_path() -> str | None:
     """Find a logo file in common locations, case-insensitive, with multiple formats."""
     search_dirs = ["images", "assets", "."]
@@ -123,11 +122,8 @@ def _find_logo_path() -> str | None:
                 return os.path.join(d, f)
     return None
 
-
 def render_logo_header() -> None:
-    """Render header with logo (left) and title (right) on the same line using columns.
-    Uses Streamlit image rendering to ensure local file support.
-    """
+    """Render header with logo (left) and title (right) on the same line using columns."""
     logo_path = _find_logo_path()
     col_left, col_mid, col_right = st.columns([1, 4, 1])
     with col_left:
@@ -144,16 +140,6 @@ def render_logo_header() -> None:
             st.markdown("<div style='font-size:28px;color:#f6b3d8;'>MOE</div>", unsafe_allow_html=True)
     with col_mid:
         st.markdown("<div class='moe-title'>Analytics Dashboard Of Last Year's Dataset</div>", unsafe_allow_html=True)
-
-
-def maybe_upload_logo() -> None:
-    uploader = st.sidebar.file_uploader("Logo (PNG/JPG)", type=["png", "jpg", "jpeg"], help="Mettre à jour le logo affiché en haut à gauche")
-    if uploader is not None:
-        os.makedirs("assets", exist_ok=True)
-        target = os.path.join("assets", "moe_logo.png")
-        with open(target, "wb") as f:
-            f.write(uploader.getbuffer())
-        st.sidebar.success("Logo mis à jour. Rafraîchir la page si besoin.")
 
 @st.cache_data
 def load_data():
@@ -181,6 +167,7 @@ def load_data():
     except Exception as e:
         st.error(f"Erreur lors du chargement des données : {e}")
         st.stop()
+    
     # Parse dates and numeric fields
     for c in ["date_inscription"]:
         if c in df:
@@ -204,7 +191,6 @@ def load_data():
     logit_presence = pd.read_csv(logit_presence_path) if os.path.exists(logit_presence_path) else pd.DataFrame()
 
     return df, kpis, logit_parcours, logit_presence
-
 
 df, kpis, logit_parcours, logit_presence = load_data()
 
@@ -240,7 +226,6 @@ if f_seg:
 view = df.loc[filt].copy()
 
 # Header
-maybe_upload_logo()
 render_logo_header()
 st.caption("Programme 2025: marseilleoutdoorexperiences.fr/programme-2025")
 
@@ -280,485 +265,489 @@ with c6:
 
 st.markdown("---")
 
-# Row: Mix parcours & Sexe
-cc1, cc2, cc3 = st.columns([1,1,1])
-with cc1:
-    st.subheader("Mix parcours")
-    vc = view["parcours_norm"].value_counts().reset_index()
-    vc.columns = ["Parcours", "Inscriptions"]
-    fig = px.pie(vc, names="Parcours", values="Inscriptions", hole=0.3)
-    st.plotly_chart(fig, use_container_width=True)
-with cc2:
-    st.subheader("Répartition par sexe")
-    vc = view["sexe"].value_counts().reset_index()
-    vc.columns = ["Sexe", "Inscriptions"]
-    fig = px.bar(vc, x="Sexe", y="Inscriptions", text="Inscriptions")
-    st.plotly_chart(fig, use_container_width=True)
-with cc3:
-    st.subheader("Tranches d'âge")
-    vc = view["tranche_age"].value_counts().sort_index().reset_index()
-    vc.columns = ["Tranche", "Inscriptions"]
-    fig = px.bar(vc, x="Tranche", y="Inscriptions", text="Inscriptions")
-    st.plotly_chart(fig, use_container_width=True)
+# 🎯 NAVIGATION AVEC MENU
+st.markdown("### 📊 Navigation")
+selected_page = st.selectbox(
+    "Choisissez une section à analyser :",
+    ["🏠 Vue d'ensemble", "🗺️ Géographie", "⏰ Temporalité", "💰 Commercial", "👥 Personas"],
+    index=0
+)
 
-# Temporalité
-st.subheader("Temporalité des inscriptions")
-if view["date_inscription"].notna().any():
-    wv = view.dropna(subset=["date_inscription"]).assign(week=lambda x: x["date_inscription"].dt.to_period("W").dt.start_time)
-    line = (
-        wv.groupby("week").size().rename("Inscriptions").reset_index()
-    )
-    fig_line = px.line(line, x="week", y="Inscriptions")
-    st.plotly_chart(fig_line, use_container_width=True)
-
-    stacked = wv.pivot_table(index="week", columns="parcours_norm", values="REF", aggfunc="count").fillna(0).reset_index()
-    fig_stack = px.area(stacked, x="week", y=[c for c in stacked.columns if c != "week"], groupnorm=None)
-    st.plotly_chart(fig_stack, use_container_width=True)
-else:
-    st.info("Pas de dates d'inscription disponibles après filtrage.")
-
-# Géographie (Top départements)
-st.subheader("Top départements")
-dep_counts = view["dep_code"].value_counts().head(20).reset_index()
-dep_counts.columns = ["Département", "Inscriptions"]
-fig_dep = px.bar(dep_counts.sort_values("Inscriptions"), x="Inscriptions", y="Département", orientation="h")
-st.plotly_chart(fig_dep, use_container_width=True)
-
-# Lead time & présence
-st.subheader("Lead time et présence")
-col1, col2 = st.columns(2)
-with col1:
-    if view["lead_days"].notna().any():
-        fig_lead = px.histogram(view, x="lead_days", nbins=30)
-        st.plotly_chart(fig_lead, use_container_width=True)
-    else:
-        st.info("Lead time non disponible.")
-with col2:
-    if "lead_bucket" in view.columns and view["lead_bucket"].notna().any():
-        pres = view.groupby(["lead_bucket", "parcours_norm"])['present'].mean().reset_index()
-        fig_pres = px.line(pres, x="lead_bucket", y="present", color="parcours_norm", markers=True)
-        fig_pres.update_layout(yaxis_tickformat=".0%")
-        st.plotly_chart(fig_pres, use_container_width=True)
-    else:
-        st.info("Pas de bucket de lead disponible.")
-
-# Promos & Paiement
-st.subheader("Promotions et paiements")
-colp1, colp2 = st.columns(2)
-with colp1:
-    promo_rate = view.groupby("parcours_norm")["promo_used"].mean().reset_index()
-    promo_rate["promo_%"] = (promo_rate["promo_used"] * 100).round(1)
-    fig_promo = px.bar(promo_rate, x="parcours_norm", y="promo_%", text="promo_%")
-    fig_promo.update_layout(yaxis_title="Promo %")
-    st.plotly_chart(fig_promo, use_container_width=True)
-with colp2:
-    if "TYPE PAIEMENT" in view.columns:
-        tp = view["TYPE PAIEMENT"].fillna("").value_counts().head(10).reset_index()
-        tp.columns = ["Type paiement", "Inscriptions"]
-        st.plotly_chart(px.bar(tp, x="Type paiement", y="Inscriptions", text="Inscriptions"), use_container_width=True)
-    else:
-        st.info("Types de paiement non disponibles dans le sous-ensemble.")
-
-# Clubs
-st.subheader("Clubs")
-club_counts = view.get("CLUB")
-if club_counts is not None:
-    cc = club_counts.fillna("").value_counts().drop(labels="", errors="ignore").head(20).reset_index()
-    cc.columns = ["Club", "Inscriptions"]
-    st.plotly_chart(px.bar(cc, x="Club", y="Inscriptions"), use_container_width=True)
-
-st.subheader("Analyses visuelles utiles")
-
-# Heatmap: présence par tranche d'âge et parcours
-try:
-    pres_pivot = (
-        view.pivot_table(index="tranche_age", columns="parcours_norm", values="present", aggfunc="mean")
-            .round(3)
-            .sort_index()
-    )
-    if pres_pivot.notna().any().any():
-        fig_hm_pres = px.imshow(
-            pres_pivot,
-            color_continuous_scale="Viridis",
-            aspect="auto",
-            labels=dict(color="Présence")
-        )
-        fig_hm_pres.update_layout(margin=dict(l=0, r=0, t=30, b=0), coloraxis_colorbar=dict(tickformat=".0%"))
-        st.markdown("Présence par tranche d'âge et parcours")
-        st.plotly_chart(fig_hm_pres, use_container_width=True)
-    else:
-        st.info("Pas assez de données pour la heatmap de présence.")
-except Exception:
-    st.info("Heatmap de présence indisponible sur ce sous-ensemble.")
-
-# Heatmap: taux d'utilisation des promos par lead time et parcours
-if "lead_bucket" in view.columns and view["lead_bucket"].notna().any():
+# 🏠 SECTION 1: VUE D'ENSEMBLE
+if selected_page == "🏠 Vue d'ensemble":
+    st.header("Vue d'ensemble des inscriptions")
+    
+    # Mix parcours, sexe, âge
+    cc1, cc2, cc3 = st.columns([1,1,1])
+    with cc1:
+        st.subheader("Mix parcours")
+        vc = view["parcours_norm"].value_counts().reset_index()
+        vc.columns = ["Parcours", "Inscriptions"]
+        fig = px.pie(vc, names="Parcours", values="Inscriptions", hole=0.3)
+        st.plotly_chart(fig, use_container_width=True)
+    with cc2:
+        st.subheader("Répartition par sexe")
+        vc = view["sexe"].value_counts().reset_index()
+        vc.columns = ["Sexe", "Inscriptions"]
+        fig = px.bar(vc, x="Sexe", y="Inscriptions", text="Inscriptions")
+        st.plotly_chart(fig, use_container_width=True)
+    with cc3:
+        st.subheader("Tranches d'âge")
+        vc = view["tranche_age"].value_counts().sort_index().reset_index()
+        vc.columns = ["Tranche", "Inscriptions"]
+        fig = px.bar(vc, x="Tranche", y="Inscriptions", text="Inscriptions")
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Présence par tranche d'âge et parcours (heatmap)
+    st.subheader("Présence par tranche d'âge et parcours")
     try:
-        promo_pivot = (
-            view.pivot_table(index="lead_bucket", columns="parcours_norm", values="promo_used", aggfunc="mean")
+        pres_pivot = (
+            view.pivot_table(index="tranche_age", columns="parcours_norm", values="present", aggfunc="mean")
                 .round(3)
+                .sort_index()
         )
-        if promo_pivot.notna().any().any():
-            fig_hm_promo = px.imshow(
-                promo_pivot,
-                color_continuous_scale="Blues",
+        if pres_pivot.notna().any().any():
+            fig_hm_pres = px.imshow(
+                pres_pivot,
+                color_continuous_scale="Viridis",
                 aspect="auto",
-                labels=dict(color="Promo %")
+                labels=dict(color="Présence")
             )
-            fig_hm_promo.update_layout(margin=dict(l=0, r=0, t=30, b=0), coloraxis_colorbar=dict(tickformat=".0%"))
-            st.markdown("Utilisation des promos par lead time et parcours")
-            st.plotly_chart(fig_hm_promo, use_container_width=True)
+            fig_hm_pres.update_layout(margin=dict(l=0, r=0, t=30, b=0), coloraxis_colorbar=dict(tickformat=".0%"))
+            st.plotly_chart(fig_hm_pres, use_container_width=True)
         else:
-            st.info("Pas assez de données pour la heatmap promos.")
+            st.info("Pas assez de données pour la heatmap de présence.")
     except Exception:
-        st.info("Heatmap promos indisponible sur ce sous-ensemble.")
+        st.info("Heatmap de présence indisponible sur ce sous-ensemble.")
 
-# Boxplot: distribution d'âge par parcours
-if view["age"].notna().any():
-    try:
-        fig_box_age = px.box(view.dropna(subset=["age"]), x="parcours_norm", y="age", points="outliers")
-        fig_box_age.update_layout(xaxis_title="Parcours", yaxis_title="Âge")
-        st.markdown("Distribution d'âge par parcours")
-        st.plotly_chart(fig_box_age, use_container_width=True)
-    except Exception:
-        st.info("Boxplot d'âge indisponible.")
-
-# Taux de présence par département (top 15 en volume)
-try:
-    top_dep_index = view["dep_code"].dropna().value_counts().head(15).index
-    dep_rate = (
-        view[view["dep_code"].isin(top_dep_index)]
-        .groupby("dep_code")["present"].mean().mul(100).round(1)
-        .sort_values(ascending=False).reset_index()
-    )
-    dep_rate.columns = ["Département", "Présence %"]
-    fig_dep_rate = px.bar(dep_rate, x="Présence %", y="Département", orientation="h", text="Présence %")
-    st.markdown("Présence par département (top 15 en volume)")
-    st.plotly_chart(fig_dep_rate, use_container_width=True)
-except Exception:
-    st.info("Taux de présence par département indisponible.")
-
-# Carte France – répartition des inscrits (cercles)
-st.subheader("Carte France – répartition des inscrits (cercles)")
-
-def _load_fr_departements_geojson(path: str = os.path.join("assets", "departements.geojson")):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    if os.path.exists(path):
+# 🗺️ SECTION 2: GÉOGRAPHIE
+elif selected_page == "🗺️ Géographie":
+    st.header("Analyses géographiques")
+    
+    # Top départements
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Top départements")
+        dep_counts = view["dep_code"].value_counts().head(15).reset_index()
+        dep_counts.columns = ["Département", "Inscriptions"]
+        fig_dep = px.bar(dep_counts.sort_values("Inscriptions"), x="Inscriptions", y="Département", orientation="h")
+        st.plotly_chart(fig_dep, use_container_width=True)
+    
+    with col2:
+        st.subheader("Taux de présence par département")
         try:
+            top_dep_index = view["dep_code"].dropna().value_counts().head(15).index
+            dep_rate = (
+                view[view["dep_code"].isin(top_dep_index)]
+                .groupby("dep_code")["present"].mean().mul(100).round(1)
+                .sort_values(ascending=False).reset_index()
+            )
+            dep_rate.columns = ["Département", "Présence %"]
+            fig_dep_rate = px.bar(dep_rate, x="Présence %", y="Département", orientation="h", text="Présence %")
+            st.plotly_chart(fig_dep_rate, use_container_width=True)
+        except Exception:
+            st.info("Taux de présence par département indisponible.")
+    
+    # Focus Local (13) vs Hors‑13 vs Paris/Lyon
+    st.subheader("Analyse géographique détaillée")
+    try:
+        def _segment_geo(row):
+            dep = str(row.get("dep_code", ""))
+            if dep == "13":
+                return "Local 13"
+            if dep in {"75", "69"}:
+                return "Paris+Lyon"
+            return "Hors 13"
+
+        geo = view.copy()
+        geo["geo_grp"] = geo.apply(_segment_geo, axis=1)
+        # KPIs par groupe
+        kpi_geo = geo.groupby("geo_grp").agg(
+            Taille=("REF", "count"),
+            Lead_méd_j=("lead_days", lambda s: float(pd.Series(s).median()) if pd.Series(s).notna().any() else None),
+            Promo_pct=("promo_used", "mean"),
+            Presence_pct=("present", "mean"),
+        ).reset_index()
+        if not kpi_geo.empty:
+            kpi_geo["Promo_pct"] = (kpi_geo["Promo_pct"] * 100).round(1)
+            kpi_geo["Presence_pct"] = (kpi_geo["Presence_pct"] * 100).round(1)
+            st.markdown("**KPIs par groupe géographique**")
+            st.dataframe(kpi_geo, use_container_width=True)
+        
+        # Tendance hebdo
+        if geo["date_inscription"].notna().any():
+            trend = (
+                geo.dropna(subset=["date_inscription"]) 
+                   .assign(week=lambda x: x["date_inscription"].dt.to_period("W").dt.start_time)
+                   .groupby(["week", "geo_grp"]).size().rename("Inscriptions").reset_index()
+            )
+            if not trend.empty:
+                fig_trend = px.line(trend, x="week", y="Inscriptions", color="geo_grp", markers=True)
+                st.markdown("**Tendance hebdomadaire par groupe géographique**")
+                st.plotly_chart(fig_trend, use_container_width=True)
+    except Exception:
+        st.info("Section géographique indisponible.")
+    
+    # Carte France – répartition des inscrits (cercles)
+    st.subheader("Carte France – répartition des inscrits")
+
+    def _load_fr_departements_geojson(path: str = os.path.join("assets", "departements.geojson")):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        # Essayer d'abord le fichier compressé
+        if os.path.exists(path + ".gz"):
+            try:
+                import gzip
+                with gzip.open(path + ".gz", "rt", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        try:
+            url = "https://france-geojson.gregoiredavid.fr/repo/departements.geojson"
+            urllib.request.urlretrieve(url, path)
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
-            pass
-    try:
-        url = "https://france-geojson.gregoiredavid.fr/repo/departements.geojson"
-        urllib.request.urlretrieve(url, path)
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return None
+            return None
 
+    def _centroid_of_polygon(coords):
+        if not coords:
+            return None
+        xs = [c[0] for c in coords]
+        ys = [c[1] for c in coords]
+        return sum(xs) / len(xs), sum(ys) / len(ys)
 
-def _centroid_of_polygon(coords):
-    if not coords:
-        return None
-    xs = [c[0] for c in coords]
-    ys = [c[1] for c in coords]
-    return sum(xs) / len(xs), sum(ys) / len(ys)
-
-
-def _compute_dept_centroids(geojson_obj):
-    centroids = {}
-    if not geojson_obj:
-        return centroids
-    for feat in geojson_obj.get("features", []):
-        props = feat.get("properties", {})
-        code = str(props.get("code", "")).zfill(2)
-        geom = feat.get("geometry", {})
-        gtype = geom.get("type")
-        coords = geom.get("coordinates")
-        lon, lat = None, None
-        try:
-            if gtype == "Polygon":
-                ring = coords[0] if coords else []
-                c = _centroid_of_polygon(ring)
-                if c:
-                    lon, lat = c
-            elif gtype == "MultiPolygon":
-                ring = coords[0][0] if coords else []
-                c = _centroid_of_polygon(ring)
-                if c:
-                    lon, lat = c
-        except Exception:
+    def _compute_dept_centroids(geojson_obj):
+        centroids = {}
+        if not geojson_obj:
+            return centroids
+        for feat in geojson_obj.get("features", []):
+            props = feat.get("properties", {})
+            code = str(props.get("code", "")).zfill(2)
+            geom = feat.get("geometry", {})
+            gtype = geom.get("type")
+            coords = geom.get("coordinates")
             lon, lat = None, None
-        if lon is not None and lat is not None:
-            centroids[code] = {"lon": float(lon), "lat": float(lat)}
-    return centroids
+            try:
+                if gtype == "Polygon":
+                    ring = coords[0] if coords else []
+                    c = _centroid_of_polygon(ring)
+                    if c:
+                        lon, lat = c
+                elif gtype == "MultiPolygon":
+                    ring = coords[0][0] if coords else []
+                    c = _centroid_of_polygon(ring)
+                    if c:
+                        lon, lat = c
+            except Exception:
+                lon, lat = None, None
+            if lon is not None and lat is not None:
+                centroids[code] = {"lon": float(lon), "lat": float(lat)}
+        return centroids
 
+    geojson_deps = _load_fr_departements_geojson()
+    centroids = _compute_dept_centroids(geojson_deps)
 
-geojson_deps = _load_fr_departements_geojson()
-centroids = _compute_dept_centroids(geojson_deps)
+    dep_counts_map = (
+        view["dep_code"].dropna().astype(str).value_counts().reset_index()
+        if "dep_code" in view.columns else pd.DataFrame(columns=["index", "dep_code"])
+    )
+    if not dep_counts_map.empty:
+        dep_counts_map.columns = ["dep_code", "count"]
+        dep_counts_map["dep_code"] = dep_counts_map["dep_code"].str.upper()
+        dep_counts_map["lon"] = dep_counts_map["dep_code"].map(lambda c: centroids.get(c, {}).get("lon"))
+        dep_counts_map["lat"] = dep_counts_map["dep_code"].map(lambda c: centroids.get(c, {}).get("lat"))
+        missing = dep_counts_map[dep_counts_map["lon"].isna()].index
+        for i in missing:
+            c = dep_counts_map.at[i, "dep_code"]
+            c2 = c.lstrip("0")
+            if c2 in centroids:
+                dep_counts_map.at[i, "lon"] = centroids[c2]["lon"]
+                dep_counts_map.at[i, "lat"] = centroids[c2]["lat"]
+            elif len(c) == 1 and ("0" + c) in centroids:
+                dep_counts_map.at[i, "lon"] = centroids["0" + c]["lon"]
+                dep_counts_map.at[i, "lat"] = centroids["0" + c]["lat"]
 
-dep_counts_map = (
-    view["dep_code"].dropna().astype(str).value_counts().reset_index()
-    if "dep_code" in view.columns else pd.DataFrame(columns=["index", "dep_code"])
-)
-if not dep_counts_map.empty:
-    dep_counts_map.columns = ["dep_code", "count"]
-    dep_counts_map["dep_code"] = dep_counts_map["dep_code"].str.upper()
-    dep_counts_map["lon"] = dep_counts_map["dep_code"].map(lambda c: centroids.get(c, {}).get("lon"))
-    dep_counts_map["lat"] = dep_counts_map["dep_code"].map(lambda c: centroids.get(c, {}).get("lat"))
-    missing = dep_counts_map[dep_counts_map["lon"].isna()].index
-    for i in missing:
-        c = dep_counts_map.at[i, "dep_code"]
-        c2 = c.lstrip("0")
-        if c2 in centroids:
-            dep_counts_map.at[i, "lon"] = centroids[c2]["lon"]
-            dep_counts_map.at[i, "lat"] = centroids[c2]["lat"]
-        elif len(c) == 1 and ("0" + c) in centroids:
-            dep_counts_map.at[i, "lon"] = centroids["0" + c]["lon"]
-            dep_counts_map.at[i, "lat"] = centroids["0" + c]["lat"]
-
-    data_map = dep_counts_map.dropna(subset=["lon", "lat"]).copy()
-    if not data_map.empty:
-        fig_map = px.scatter_mapbox(
-            data_map,
-            lat="lat",
-            lon="lon",
-            size="count",
-            hover_name="dep_code",
-            hover_data={"count": True, "lat": False, "lon": False},
-            color_discrete_sequence=[PRIMARY_PINK],
-            zoom=4.2,
-            size_max=70,
-            height=520,
-        )
-        fig_map.update_layout(mapbox_style="carto-darkmatter", margin=dict(l=0, r=0, t=0, b=0))
-        st.plotly_chart(fig_map, use_container_width=True)
-    else:
-        st.info("Centroides indisponibles pour les départements présents.")
-else:
-    st.info("Aucun département disponible pour la carte.")
-
-# Heatmap jour × heure des inscriptions et créneaux recommandés
-try:
-    if view["date_inscription"].notna().any():
-        tmp = view.dropna(subset=["date_inscription"]).copy()
-        tmp["jour_idx"] = tmp["date_inscription"].dt.dayofweek
-        jour_map = {0: "Lundi", 1: "Mardi", 2: "Mercredi", 3: "Jeudi", 4: "Vendredi", 5: "Samedi", 6: "Dimanche"}
-        tmp["jour"] = tmp["jour_idx"].map(jour_map)
-        tmp["heure"] = tmp["date_inscription"].dt.hour
-        # Pivot counts
-        pv = tmp.pivot_table(index="jour_idx", columns="heure", values="REF", aggfunc="count").fillna(0)
-        # Remap index to day labels and order
-        pv.index = [jour_map.get(i, str(i)) for i in pv.index]
-        pv = pv.reindex(["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"]) 
-        fig_do_h = px.imshow(pv, color_continuous_scale="Oranges", aspect="auto", labels=dict(color="Inscriptions"))
-        fig_do_h.update_layout(margin=dict(l=0, r=0, t=30, b=0))
-        st.markdown("Inscriptions par jour × heure (heatmap)")
-        st.plotly_chart(fig_do_h, use_container_width=True)
-        # Top créneaux
-        long = pv.reset_index().melt(id_vars="index", var_name="heure", value_name="inscriptions").rename(columns={"index":"jour"})
-        top_slots = long.sort_values("inscriptions", ascending=False).head(5)
-        if not top_slots.empty:
-            st.markdown("Créneaux recommandés (top 5)")
-            st.dataframe(top_slots.reset_index(drop=True))
-    else:
-        st.info("Pas de dates pour construire la heatmap jour × heure.")
-except Exception:
-    st.info("Heatmap jour × heure indisponible.")
-
-# Matrice parcours × tranche d'âge – écart de présence vs moyenne globale
-try:
-    if view["tranche_age"].notna().any():
-        base_rate = float(view["present"].mean()) if len(view) else 0.0
-        mtx = view.pivot_table(index="tranche_age", columns="parcours_norm", values="present", aggfunc="mean")
-        if mtx is not None and not mtx.empty:
-            delta = (mtx - base_rate).round(3)
-            delta = delta.sort_index()
-            fig_delta = px.imshow(
-                delta,
-                color_continuous_scale="RdBu",
-                zmin=-abs(delta.values).max() if delta.size else -0.1,
-                zmax=abs(delta.values).max() if delta.size else 0.1,
-                aspect="auto",
-                labels=dict(color="Écart présence")
+        data_map = dep_counts_map.dropna(subset=["lon", "lat"]).copy()
+        if not data_map.empty:
+            fig_map = px.scatter_mapbox(
+                data_map,
+                lat="lat",
+                lon="lon",
+                size="count",
+                hover_name="dep_code",
+                hover_data={"count": True, "lat": False, "lon": False},
+                color_discrete_sequence=[PRIMARY_PINK],
+                zoom=4.2,
+                size_max=70,
+                height=520,
+                title="Répartition géographique des inscriptions"
             )
-            fig_delta.update_layout(margin=dict(l=0, r=0, t=30, b=0))
-            st.markdown("Écart de présence vs moyenne – matrice tranche d'âge × parcours")
-            st.plotly_chart(fig_delta, use_container_width=True)
+            fig_map.update_layout(mapbox_style="carto-darkmatter", margin=dict(l=0, r=0, t=30, b=0))
+            st.plotly_chart(fig_map, use_container_width=True)
+        else:
+            st.info("Centroides indisponibles pour les départements présents.")
     else:
-        st.info("Données insuffisantes pour la matrice d'écart de présence.")
-except Exception:
-    st.info("Matrice d'écart de présence indisponible.")
+        st.info("Aucun département disponible pour la carte.")
 
-# Focus Local (13) vs Hors‑13 vs Paris/Lyon
-try:
-    def _segment_geo(row):
-        dep = str(row.get("dep_code", ""))
-        if dep == "13":
-            return "Local 13"
-        if dep in {"75", "69"}:
-            return "Paris+Lyon"
-        return "Hors 13"
-
-    geo = view.copy()
-    geo["geo_grp"] = geo.apply(_segment_geo, axis=1)
-    # KPIs par groupe
-    kpi_geo = geo.groupby("geo_grp").agg(
-        Taille=("REF", "count"),
-        Lead_méd_j=("lead_days", lambda s: float(pd.Series(s).median()) if pd.Series(s).notna().any() else None),
-        Promo_pct=("promo_used", "mean"),
-        Presence_pct=("present", "mean"),
-    ).reset_index()
-    if not kpi_geo.empty:
-        kpi_geo["Promo_pct"] = (kpi_geo["Promo_pct"] * 100).round(1)
-        kpi_geo["Presence_pct"] = (kpi_geo["Presence_pct"] * 100).round(1)
-        st.markdown("KPIs par groupe géographique")
-        st.dataframe(kpi_geo)
-    # Tendance hebdo
-    if geo["date_inscription"].notna().any():
-        trend = (
-            geo.dropna(subset=["date_inscription"]) 
-               .assign(week=lambda x: x["date_inscription"].dt.to_period("W").dt.start_time)
-               .groupby(["week", "geo_grp"]).size().rename("Inscriptions").reset_index()
+# ⏰ SECTION 3: TEMPORALITÉ
+elif selected_page == "⏰ Temporalité":
+    st.header("Analyses temporelles")
+    
+    # Temporalité des inscriptions
+    st.subheader("Évolution des inscriptions")
+    if view["date_inscription"].notna().any():
+        wv = view.dropna(subset=["date_inscription"]).assign(week=lambda x: x["date_inscription"].dt.to_period("W").dt.start_time)
+        line = (
+            wv.groupby("week").size().rename("Inscriptions").reset_index()
         )
-        if not trend.empty:
-            fig_trend = px.line(trend, x="week", y="Inscriptions", color="geo_grp", markers=True)
-            st.markdown("Tendance hebdomadaire des inscriptions par groupe géographique")
-            st.plotly_chart(fig_trend, use_container_width=True)
-except Exception:
-    st.info("Section géographique indisponible.")
+        fig_line = px.line(line, x="week", y="Inscriptions", markers=True)
+        st.plotly_chart(fig_line, use_container_width=True)
 
-st.markdown("---")
-
-# Onglets Personas
-st.header("Cibles & Personas")
-tab_simple, tab_data = st.tabs(["Personas (simple)", "Détails data (segments)"])
-
-# Base enrichie pour personas
-def _enrich_base_for_personas(df_all: pd.DataFrame) -> pd.DataFrame:
-    b = df_all.copy()
-    b["is_local"] = b["dep_code"].eq("13").astype(int)
-    b["is_female"] = b["sexe"].eq("F").astype(int)
-    b["has_club_int"] = b.get("CLUB", pd.Series([np.nan]*len(b))).fillna("").ne("").astype(int)
-    b["promo_int"] = b["promo_used"].astype(int)
-    b["p21"] = b["parcours_norm"].eq("21km").astype(int)
-    b["p12"] = b["parcours_norm"].eq("12km").astype(int)
-    b["late_decider"] = (b["lead_days"] <= 14).fillna(False).astype(int)
-    b["non_local"] = (b["is_local"] == 0).astype(int)
-    b["paris_lyon"] = b["dep_code"].isin(["75","69"]).astype(int)
-    b["age_ok_25_44"] = b["age"].between(25, 44, inclusive="both").fillna(False).astype(int)
-    b["age_ok_25_34"] = b["age"].between(25, 34, inclusive="both").fillna(False).astype(int)
-    return b
-
-base_all = _enrich_base_for_personas(df)
-
-with tab_simple:
-    st.write("Cartes synthétiques des 6 personas clés, avec messages et offres.")
-
-    def card(title: str, size: int, percent: float, bullets: list[str]):
-        c = st.container(border=True)
-        c.markdown(f"### {title}")
-        cols = c.columns(2)
-        cols[0].metric("Taille", f"{size:,}".replace(","," "))
-        cols[1].metric("Part", f"{percent:.1f}%")
-        for b in bullets:
-            c.markdown(f"- {b}")
-
-    total = len(base_all)
-
-    # 1. Locaux 25–44 – 12km urbain fun
-    m1 = (base_all["is_local"].eq(1) & base_all["age_ok_25_44"].eq(1) & base_all["p12"].eq(1))
-    n1 = int(m1.sum()); p1 = (n1/total*100) if total else 0
-    card("Locaux 25–44 – 12 km urbain fun", n1, p1, [
-        "Message: Vivre Marseille entre amis; finish party",
-        "Offres: TEAM5 (‑10% dès 5), CE locaux",
-        "Canaux: IG/TikTok local, affichage micro‑local",
-    ])
-
-    # 2. Défi 21 km – hommes 25–44 (clubs)
-    m2 = (base_all["p21"].eq(1) & base_all["age_ok_25_44"].eq(1) & base_all["is_female"].eq(0))
-    n2 = int(m2.sum()); p2 = (n2/total*100) if total else 0
-    card("Défi 21 km – hommes 25–44 (clubs)", n2, p2, [
-        "Message: Conquérir la ville; segments mythiques; sas chrono",
-        "Offres: CLUB10, dotations capitaines",
-        "Canaux: Strava, clubs FFA, retailers running",
-    ])
-
-    # 3. Femmes 25–34 – 12 km crew
-    m3 = (base_all["p12"].eq(1) & base_all["age_ok_25_34"].eq(1) & base_all["is_female"].eq(1))
-    n3 = int(m3.sum()); p3 = (n3/total*100) if total else 0
-    card("Femmes 25–34 – 12 km crew", n3, p3, [
-        "Message: Accessible, fun, instagrammable",
-        "Offres: Girls Crew (‑10% à 3)",
-        "Canaux: Créateurs locaux, UGC",
-    ])
-
-    # 4. Non‑locaux Paris/Lyon (week‑end destination)
-    m4 = base_all["paris_lyon"].eq(1)
-    n4 = int(m4.sum()); p4 = (n4/total*100) if total else 0
-    card("Non‑locaux Paris/Lyon – week‑end destination", n4, p4, [
-        "Message: City‑trail + mer + culture – 48h à Marseille",
-        "Offres: WEEKENDMOE (train/hôtel limité)",
-        "Canaux: Meta ciblage 75/69, OT/hôtels",
-    ])
-
-    # 5. Décideurs tardifs (≤14 j)
-    m5 = base_all["late_decider"].eq(1)
-    n5 = int(m5.sum()); p5 = (n5/total*100) if total else 0
-    card("Décideurs tardifs (≤14 j)", n5, p5, [
-        "Message: Derniers dossards; logistique simple; météo",
-        "Tactiques: relances J‑14/J‑7/J‑3, stock restreint",
-    ])
-
-    # 6. Entreprises/Clubs locaux
-    m6 = (base_all["has_club_int"].eq(1) & base_all["is_local"].eq(1))
-    n6 = int(m6.sum()); p6 = (n6/total*100) if total else 0
-    card("Entreprises/Clubs locaux", n6, p6, [
-        "Message: Team‑building urbain",
-        "Offres: conventions clubs/CE, quotas, classement inter‑clubs",
-    ])
-
-    st.markdown("—")
-    st.markdown("Télécharger la synthèse des personas (CSV)")
-    import io
-    persona_csv = io.StringIO()
-    pd.DataFrame([
-        {"Persona":"Locaux 25–44 – 12 km","Taille":n1,"Part_%":round(p1,1)},
-        {"Persona":"Défi 21 km – H 25–44","Taille":n2,"Part_%":round(p2,1)},
-        {"Persona":"Femmes 25–34 – 12 km","Taille":n3,"Part_%":round(p3,1)},
-        {"Persona":"Paris/Lyon – week‑end","Taille":n4,"Part_%":round(p4,1)},
-        {"Persona":"Décideurs tardifs","Taille":n5,"Part_%":round(p5,1)},
-        {"Persona":"Entreprises/Clubs locaux","Taille":n6,"Part_%":round(p6,1)},
-    ]).to_csv(persona_csv, index=False)
-    st.download_button("Exporter CSV", persona_csv.getvalue(), file_name="personas_moe.csv", mime="text/csv")
-
-with tab_data:
-    # Reprise de la vue data détaillée (segments + top targets)
-    base = _enrich_base_for_personas(df)
-    if base["segment"].notna().any():
-        grp = base.groupby("segment")
-        persona = pd.DataFrame({
-            "Taille": grp.size(),
-            "Âge_moy": grp["age"].mean().round(1),
-            "Lead_méd_j": grp["lead_days"].median(),
-            "Local13_%": (grp["is_local"].mean()*100).round(1),
-            "F_%": (grp["is_female"].mean()*100).round(1),
-            "Club_%": (grp["has_club_int"].mean()*100).round(1),
-            "Promo_%": (grp["promo_int"].mean()*100).round(1),
-            "21km_%": (grp["p21"].mean()*100).round(1),
-            "Présence_%": (grp["present"].mean()*100).round(1),
-            "NonLocal_%": (grp["non_local"].mean()*100).round(1),
-            "ParisLyon_%": (grp["paris_lyon"].mean()*100).round(1),
-            "Late_%": (grp["late_decider"].mean()*100).round(1),
-        }).reset_index()
-        st.dataframe(persona.sort_values(["Taille"], ascending=False), use_container_width=True)
+        st.subheader("Inscriptions par parcours dans le temps")
+        stacked = wv.pivot_table(index="week", columns="parcours_norm", values="REF", aggfunc="count").fillna(0).reset_index()
+        fig_stack = px.area(stacked, x="week", y=[c for c in stacked.columns if c != "week"], groupnorm=None)
+        st.plotly_chart(fig_stack, use_container_width=True)
     else:
-        st.info("Segments indisponibles pour construire les personas.")
+        st.info("Pas de dates d'inscription disponibles après filtrage.")
+    
+    # Lead time analyses
+    st.subheader("Analyses de lead time")
+    col1, col2 = st.columns(2)
+    with col1:
+        if view["lead_days"].notna().any():
+            fig_lead = px.histogram(view, x="lead_days", nbins=30, title="Distribution des lead times")
+            st.plotly_chart(fig_lead, use_container_width=True)
+        else:
+            st.info("Lead time non disponible.")
+    with col2:
+        if "lead_bucket" in view.columns and view["lead_bucket"].notna().any():
+            pres = view.groupby(["lead_bucket", "parcours_norm"])['present'].mean().reset_index()
+            fig_pres = px.line(pres, x="lead_bucket", y="present", color="parcours_norm", markers=True, title="Présence par lead time")
+            fig_pres.update_layout(yaxis_tickformat=".0%")
+            st.plotly_chart(fig_pres, use_container_width=True)
+        else:
+            st.info("Pas de bucket de lead disponible.")
+    
+    # Heatmap jour × heure
+    st.subheader("Inscriptions par jour et heure")
+    try:
+        if view["date_inscription"].notna().any():
+            tmp = view.dropna(subset=["date_inscription"]).copy()
+            tmp["jour_idx"] = tmp["date_inscription"].dt.dayofweek
+            jour_map = {0: "Lundi", 1: "Mardi", 2: "Mercredi", 3: "Jeudi", 4: "Vendredi", 5: "Samedi", 6: "Dimanche"}
+            tmp["jour"] = tmp["jour_idx"].map(jour_map)
+            tmp["heure"] = tmp["date_inscription"].dt.hour
+            # Pivot counts
+            pv = tmp.pivot_table(index="jour_idx", columns="heure", values="REF", aggfunc="count").fillna(0)
+            # Remap index to day labels and order
+            pv.index = [jour_map.get(i, str(i)) for i in pv.index]
+            pv = pv.reindex(["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"]) 
+            fig_do_h = px.imshow(pv, color_continuous_scale="Oranges", aspect="auto", labels=dict(color="Inscriptions"))
+            fig_do_h.update_layout(margin=dict(l=0, r=0, t=30, b=0))
+            st.plotly_chart(fig_do_h, use_container_width=True)
+            
+            # Top créneaux
+            long = pv.reset_index().melt(id_vars="index", var_name="heure", value_name="inscriptions").rename(columns={"index":"jour"})
+            top_slots = long.sort_values("inscriptions", ascending=False).head(5)
+            if not top_slots.empty:
+                st.subheader("Créneaux recommandés (top 5)")
+                st.dataframe(top_slots.reset_index(drop=True), use_container_width=True)
+        else:
+            st.info("Pas de dates pour construire la heatmap jour × heure.")
+    except Exception:
+        st.info("Heatmap jour × heure indisponible.")
 
+# 💰 SECTION 4: COMMERCIAL
+elif selected_page == "💰 Commercial":
+    st.header("Analyses commerciales")
+    
+    # Promos & Paiement
+    st.subheader("Promotions et paiements")
+    colp1, colp2 = st.columns(2)
+    with colp1:
+        st.markdown("**Utilisation des promos par parcours**")
+        promo_rate = view.groupby("parcours_norm")["promo_used"].mean().reset_index()
+        promo_rate["promo_%"] = (promo_rate["promo_used"] * 100).round(1)
+        fig_promo = px.bar(promo_rate, x="parcours_norm", y="promo_%", text="promo_%")
+        fig_promo.update_layout(yaxis_title="Promo %")
+        st.plotly_chart(fig_promo, use_container_width=True)
+    with colp2:
+        if "TYPE PAIEMENT" in view.columns:
+            st.markdown("**Types de paiement**")
+            tp = view["TYPE PAIEMENT"].fillna("").value_counts().head(10).reset_index()
+            tp.columns = ["Type paiement", "Inscriptions"]
+            st.plotly_chart(px.bar(tp, x="Type paiement", y="Inscriptions", text="Inscriptions"), use_container_width=True)
+        else:
+            st.info("Types de paiement non disponibles dans le sous-ensemble.")
+    
+    # Heatmap promos par lead time et parcours
+    if "lead_bucket" in view.columns and view["lead_bucket"].notna().any():
+        st.subheader("Utilisation des promos par lead time et parcours")
+        try:
+            promo_pivot = (
+                view.pivot_table(index="lead_bucket", columns="parcours_norm", values="promo_used", aggfunc="mean")
+                    .round(3)
+            )
+            if promo_pivot.notna().any().any():
+                fig_hm_promo = px.imshow(
+                    promo_pivot,
+                    color_continuous_scale="Blues",
+                    aspect="auto",
+                    labels=dict(color="Promo %")
+                )
+                fig_hm_promo.update_layout(margin=dict(l=0, r=0, t=30, b=0), coloraxis_colorbar=dict(tickformat=".0%"))
+                st.plotly_chart(fig_hm_promo, use_container_width=True)
+            else:
+                st.info("Pas assez de données pour la heatmap promos.")
+        except Exception:
+            st.info("Heatmap promos indisponible sur ce sous-ensemble.")
+    
+    # Clubs
+    st.subheader("Analyses clubs")
+    club_counts = view.get("CLUB")
+    if club_counts is not None:
+        cc = club_counts.fillna("").value_counts().drop(labels="", errors="ignore").head(20).reset_index()
+        cc.columns = ["Club", "Inscriptions"]
+        fig_clubs = px.bar(cc, x="Club", y="Inscriptions", title="Top 20 clubs")
+        fig_clubs.update_layout(xaxis_tickangle=45)
+        st.plotly_chart(fig_clubs, use_container_width=True)
+    else:
+        st.info("Données clubs non disponibles.")
+
+# 👥 SECTION 5: PERSONAS
+elif selected_page == "👥 Personas":
+    st.header("Cibles & Personas")
+    tab_simple, tab_data = st.tabs(["Personas (simple)", "Détails data (segments)"])
+    
+    # Base enrichie pour personas
+    def _enrich_base_for_personas(df_all: pd.DataFrame) -> pd.DataFrame:
+        b = df_all.copy()
+        b["is_local"] = b["dep_code"].eq("13").astype(int)
+        b["is_female"] = b["sexe"].eq("F").astype(int)
+        b["has_club_int"] = b.get("CLUB", pd.Series([np.nan]*len(b))).fillna("").ne("").astype(int)
+        b["promo_int"] = b["promo_used"].astype(int)
+        b["p21"] = b["parcours_norm"].eq("21km").astype(int)
+        b["p12"] = b["parcours_norm"].eq("12km").astype(int)
+        b["late_decider"] = (b["lead_days"] <= 14).fillna(False).astype(int)
+        b["non_local"] = (b["is_local"] == 0).astype(int)
+        b["paris_lyon"] = b["dep_code"].isin(["75","69"]).astype(int)
+        b["age_ok_25_44"] = b["age"].between(25, 44, inclusive="both").fillna(False).astype(int)
+        b["age_ok_25_34"] = b["age"].between(25, 34, inclusive="both").fillna(False).astype(int)
+        return b
+
+    base_all = _enrich_base_for_personas(df)
+
+    with tab_simple:
+        st.write("Cartes synthétiques des 6 personas clés, avec messages et offres.")
+
+        def card(title: str, size: int, percent: float, bullets: list[str]):
+            c = st.container(border=True)
+            c.markdown(f"### {title}")
+            cols = c.columns(2)
+            cols[0].metric("Taille", f"{size:,}".replace(","," "))
+            cols[1].metric("Part", f"{percent:.1f}%")
+            for b in bullets:
+                c.markdown(f"- {b}")
+
+        total = len(base_all)
+
+        # 1. Locaux 25–44 – 12km urbain fun
+        m1 = (base_all["is_local"].eq(1) & base_all["age_ok_25_44"].eq(1) & base_all["p12"].eq(1))
+        n1 = int(m1.sum()); p1 = (n1/total*100) if total else 0
+        card("Locaux 25–44 – 12 km urbain fun", n1, p1, [
+            "Message: Vivre Marseille entre amis; finish party",
+            "Offres: TEAM5 (‑10% dès 5), CE locaux",
+            "Canaux: IG/TikTok local, affichage micro‑local",
+        ])
+
+        # 2. Défi 21 km – hommes 25–44 (clubs)
+        m2 = (base_all["p21"].eq(1) & base_all["age_ok_25_44"].eq(1) & base_all["is_female"].eq(0))
+        n2 = int(m2.sum()); p2 = (n2/total*100) if total else 0
+        card("Défi 21 km – hommes 25–44 (clubs)", n2, p2, [
+            "Message: Conquérir la ville; segments mythiques; sas chrono",
+            "Offres: CLUB10, dotations capitaines",
+            "Canaux: Strava, clubs FFA, retailers running",
+        ])
+
+        # 3. Femmes 25–34 – 12 km crew
+        m3 = (base_all["p12"].eq(1) & base_all["age_ok_25_34"].eq(1) & base_all["is_female"].eq(1))
+        n3 = int(m3.sum()); p3 = (n3/total*100) if total else 0
+        card("Femmes 25–34 – 12 km crew", n3, p3, [
+            "Message: Accessible, fun, instagrammable",
+            "Offres: Girls Crew (‑10% à 3)",
+            "Canaux: Créateurs locaux, UGC",
+        ])
+
+        # 4. Non‑locaux Paris/Lyon (week‑end destination)
+        m4 = base_all["paris_lyon"].eq(1)
+        n4 = int(m4.sum()); p4 = (n4/total*100) if total else 0
+        card("Non‑locaux Paris/Lyon – week‑end destination", n4, p4, [
+            "Message: City‑trail + mer + culture – 48h à Marseille",
+            "Offres: WEEKENDMOE (train/hôtel limité)",
+            "Canaux: Meta ciblage 75/69, OT/hôtels",
+        ])
+
+        # 5. Décideurs tardifs (≤14 j)
+        m5 = base_all["late_decider"].eq(1)
+        n5 = int(m5.sum()); p5 = (n5/total*100) if total else 0
+        card("Décideurs tardifs (≤14 j)", n5, p5, [
+            "Message: Derniers dossards; logistique simple; météo",
+            "Tactiques: relances J‑14/J‑7/J‑3, stock restreint",
+        ])
+
+        # 6. Entreprises/Clubs locaux
+        m6 = (base_all["has_club_int"].eq(1) & base_all["is_local"].eq(1))
+        n6 = int(m6.sum()); p6 = (n6/total*100) if total else 0
+        card("Entreprises/Clubs locaux", n6, p6, [
+            "Message: Team‑building urbain",
+            "Offres: conventions clubs/CE, quotas, classement inter‑clubs",
+        ])
+
+        st.markdown("—")
+        st.markdown("Télécharger la synthèse des personas (CSV)")
+        import io
+        persona_csv = io.StringIO()
+        pd.DataFrame([
+            {"Persona":"Locaux 25–44 – 12 km","Taille":n1,"Part_%":round(p1,1)},
+            {"Persona":"Défi 21 km – H 25–44","Taille":n2,"Part_%":round(p2,1)},
+            {"Persona":"Femmes 25–34 – 12 km","Taille":n3,"Part_%":round(p3,1)},
+            {"Persona":"Paris/Lyon – week‑end","Taille":n4,"Part_%":round(p4,1)},
+            {"Persona":"Décideurs tardifs","Taille":n5,"Part_%":round(p5,1)},
+            {"Persona":"Entreprises/Clubs locaux","Taille":n6,"Part_%":round(p6,1)},
+        ]).to_csv(persona_csv, index=False)
+        st.download_button("Exporter CSV", persona_csv.getvalue(), file_name="personas_moe.csv", mime="text/csv")
+
+    with tab_data:
+        # Reprise de la vue data détaillée (segments + top targets)
+        base = _enrich_base_for_personas(df)
+        if base["segment"].notna().any():
+            grp = base.groupby("segment")
+            persona = pd.DataFrame({
+                "Taille": grp.size(),
+                "Âge_moy": grp["age"].mean().round(1),
+                "Lead_méd_j": grp["lead_days"].median(),
+                "Local13_%": (grp["is_local"].mean()*100).round(1),
+                "F_%": (grp["is_female"].mean()*100).round(1),
+                "Club_%": (grp["has_club_int"].mean()*100).round(1),
+                "Promo_%": (grp["promo_int"].mean()*100).round(1),
+                "21km_%": (grp["p21"].mean()*100).round(1),
+                "Présence_%": (grp["present"].mean()*100).round(1),
+                "NonLocal_%": (grp["non_local"].mean()*100).round(1),
+                "ParisLyon_%": (grp["paris_lyon"].mean()*100).round(1),
+                "Late_%": (grp["late_decider"].mean()*100).round(1),
+            }).reset_index()
+            st.dataframe(persona.sort_values(["Taille"], ascending=False), use_container_width=True)
+        else:
+            st.info("Segments indisponibles pour construire les personas.")
+
+# Analyses visuelles utiles (heatmaps)
 st.markdown("---")
-st.caption("© MOE 2024 – Dashboard analytique. Programme 2025: https://www.marseilleoutdoorexperiences.fr/programme-2025") 
-
 st.subheader("Analyses visuelles utiles")
 
 # Heatmap: présence par tranche d'âge et parcours
@@ -773,59 +762,37 @@ try:
             pres_pivot,
             color_continuous_scale="Viridis",
             aspect="auto",
-            labels=dict(color="Présence")
+            labels=dict(color="Présence"),
+            title="Taux de présence par tranche d'âge et parcours"
         )
         fig_hm_pres.update_layout(margin=dict(l=0, r=0, t=30, b=0), coloraxis_colorbar=dict(tickformat=".0%"))
-        st.markdown("Présence par tranche d'âge et parcours")
         st.plotly_chart(fig_hm_pres, use_container_width=True)
     else:
-        st.info("Pas assez de données pour la heatmap de présence.")
+        st.info("Heatmap de présence indisponible sur ce sous-ensemble.")
 except Exception:
     st.info("Heatmap de présence indisponible sur ce sous-ensemble.")
 
-# Heatmap: taux d'utilisation des promos par lead time et parcours
-if "lead_bucket" in view.columns and view["lead_bucket"].notna().any():
-    try:
-        promo_pivot = (
-            view.pivot_table(index="lead_bucket", columns="parcours_norm", values="promo_used", aggfunc="mean")
-                .round(3)
-        )
-        if promo_pivot.notna().any().any():
-            fig_hm_promo = px.imshow(
-                promo_pivot,
-                color_continuous_scale="Blues",
-                aspect="auto",
-                labels=dict(color="Promo %")
-            )
-            fig_hm_promo.update_layout(margin=dict(l=0, r=0, t=30, b=0), coloraxis_colorbar=dict(tickformat=".0%"))
-            st.markdown("Utilisation des promos par lead time et parcours")
-            st.plotly_chart(fig_hm_promo, use_container_width=True)
-        else:
-            st.info("Pas assez de données pour la heatmap promos.")
-    except Exception:
-        st.info("Heatmap promos indisponible sur ce sous-ensemble.")
-
-# Boxplot: distribution d'âge par parcours
-if view["age"].notna().any():
-    try:
-        fig_box_age = px.box(view.dropna(subset=["age"]), x="parcours_norm", y="age", points="outliers")
-        fig_box_age.update_layout(xaxis_title="Parcours", yaxis_title="Âge")
-        st.markdown("Distribution d'âge par parcours")
-        st.plotly_chart(fig_box_age, use_container_width=True)
-    except Exception:
-        st.info("Boxplot d'âge indisponible.")
-
-# Taux de présence par département (top 15 en volume)
+# Heatmap: inscriptions par tranche d'âge et parcours  
 try:
-    top_dep_index = view["dep_code"].dropna().value_counts().head(15).index
-    dep_rate = (
-        view[view["dep_code"].isin(top_dep_index)]
-        .groupby("dep_code")["present"].mean().mul(100).round(1)
-        .sort_values(ascending=False).reset_index()
+    count_pivot = (
+        view.pivot_table(index="tranche_age", columns="parcours_norm", values="REF", aggfunc="count")
+            .fillna(0)
+            .sort_index()
     )
-    dep_rate.columns = ["Département", "Présence %"]
-    fig_dep_rate = px.bar(dep_rate, x="Présence %", y="Département", orientation="h", text="Présence %")
-    st.markdown("Présence par département (top 15 en volume)")
-    st.plotly_chart(fig_dep_rate, use_container_width=True)
+    if count_pivot.notna().any().any():
+        fig_hm_count = px.imshow(
+            count_pivot,
+            color_continuous_scale="Blues",
+            aspect="auto",
+            labels=dict(color="Inscriptions"),
+            title="Nombre d'inscriptions par tranche d'âge et parcours"
+        )
+        fig_hm_count.update_layout(margin=dict(l=0, r=0, t=30, b=0))
+        st.plotly_chart(fig_hm_count, use_container_width=True)
+    else:
+        st.info("Heatmap d'inscriptions indisponible sur ce sous-ensemble.")
 except Exception:
-    st.info("Taux de présence par département indisponible.") 
+    st.info("Heatmap d'inscriptions indisponible sur ce sous-ensemble.")
+
+st.markdown("---")
+st.caption("© MOE 2024 – Dashboard analytique. Programme 2025: https://www.marseilleoutdoorexperiences.fr/programme-2025")
