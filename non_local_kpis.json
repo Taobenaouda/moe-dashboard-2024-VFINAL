@@ -1,0 +1,45 @@
+{
+  "inscrits_non_locaux": 567,
+  "share_non_locaux_pct": 23.7,
+  "parcours_mix": {
+    "12km": 284,
+    "21km": 283
+  },
+  "sexe_mix": {
+    "H": 353,
+    "F": 214
+  },
+  "top_departements_ext": {
+    "83": 66,
+    "75": 49,
+    "69": 40,
+    "34": 36,
+    "84": 34,
+    "30": 21,
+    "38": 18,
+    "04": 17,
+    "42": 17,
+    "05": 17,
+    "26": 16,
+    "06": 15,
+    "92": 12,
+    "31": 12,
+    "33": 11,
+    "74": 10,
+    "59": 9,
+    "25": 8,
+    "63": 7,
+    "73": 7
+  },
+  "dep_75_count": 49,
+  "dep_75_lead_median": 58.0,
+  "dep_75_promo_pct": 20.4,
+  "dep_75_presence_pct": 81.6,
+  "dep_69_count": 40,
+  "dep_69_lead_median": 79.0,
+  "dep_69_promo_pct": 22.5,
+  "dep_69_presence_pct": 97.5,
+  "lead_median": 73.0,
+  "promo_pct": 15.0,
+  "presence_pct": 89.1
+}
