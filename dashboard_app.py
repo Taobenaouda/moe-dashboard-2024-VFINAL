@@ -23,6 +23,38 @@ st.set_page_config(
     }
 )
 
+# Fonction de login
+def check_login():
+    """Vérifie l'authentification de l'utilisateur"""
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    
+    if not st.session_state.authenticated:
+        st.title("🔐 Accès sécurisé - MOE Dashboard 2024")
+        st.markdown("---")
+        
+        with st.form("login_form"):
+            col1, col2, col3 = st.columns([1,2,1])
+            with col2:
+                st.markdown("### Connexion requise")
+                username = st.text_input("Nom d'utilisateur:")
+                password = st.text_input("Mot de passe:", type="password")
+                submitted = st.form_submit_button("Se connecter", use_container_width=True)
+                
+                if submitted:
+                    if username == "admin" and password == "AdminMOE13":
+                        st.session_state.authenticated = True
+                        st.success("✅ Connexion réussie ! Redirection...")
+                        st.rerun()
+                    else:
+                        st.error("❌ Identifiants incorrects")
+                        st.info("💡 Utilisez les identifiants fournis")
+        
+        st.stop()
+
+# Vérifier l'authentification au début
+check_login()
+
 # ---- THEME (dark with pink accent) ----
 PRIMARY_PINK = "#f6b3d8"
 ACCENT_VIOLET = "#b08ae6"  # violet pâle pour tags/puces
